@@ -1,0 +1,37 @@
+---
+- name: Configure Users and SSH Keys
+  hosts: all
+  become: yes
+  become_user: root
+  ignore_errors: yes
+
+  vars:
+    users:
+      - name: test4
+      - name: test3
+
+  tasks:
+    - name: Create Users
+      ansible.builtin.user:
+       name: "{{ item.name }}"
+       state: present
+       shell: /bin/bash
+       create_home: yes
+       password: "{{ 'item.name@2024' | password_hash('sha512') }}"
+       generate_ssh_key: yes
+       ssh_key_bits: 2048
+       ssh_key_file: /home/{{ item.name }}/.ssh/id_rsa
+       ssh_key_comment: "{{ item.name }}"
+      with_items: "{{ users }}"
+    
+    - name: Rename id_rsa.pub file to authorized_keys
+      command: mv /home/{{ item.name }}/.ssh/id_rsa.pub /home/{{ item.name }}/.ssh/authorized_keys
+      with_items: "{{ users }}"  
+
+    - name: Allow Users to Run Sudo Without Password Prompt
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        line: "{{ item.name }} ALL=(ALL) NOPASSWD: ALL"
+        validate: 'visudo -cf %s'
+      with_items: "{{ users }}"
+
