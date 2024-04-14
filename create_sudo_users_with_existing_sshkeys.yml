@@ -1,0 +1,54 @@
+---
+- name : create users with existing ssh Keys
+  hosts: all
+  become: yes
+  ignore_errors: yes
+  vars:
+    users:
+      - name: test5
+        ssh_key: my ssh-key
+     
+  tasks:
+    - name: create users
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        state: present
+        createhome: yes
+        shell: /bin/bash
+        password: "{{ 'item.name@2024' | password_hash('sha512') }}"
+      with_items: "{{ users }}"
+
+    - name : set permissions for home directory
+      ansible.builtin.file:
+       path: "/home/{{item.name}}"
+       state: directory
+       mode: "0700"
+      with_items: "{{users}}" 
+        
+    - name : create .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        mode: "0700"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+      with_items: "{{ users }}"   
+
+    - name: add ssh keys
+      ansible.builtin.copy:
+        content: "{{ item.ssh_key }}"
+        dest: "{{ '/home/' ~ item.name ~ '/.ssh/authorized_keys' }}"
+        mode: "0600"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+      with_items: "{{ users }}"
+
+
+    - name: Allow Users to Run Sudo Without Password Prompt
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        line: "{{ item.name }} ALL=(ALL) NOPASSWD: ALL"
+        validate: 'visudo -cf %s'
+      with_items: "{{ users }}"
+
+      
