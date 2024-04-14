@@ -1,0 +1,22 @@
+--- 
+- name: pre-checks
+  hosts: all      
+  tasks:
+    - command: "{{item}}"
+      loop: 
+        - uptime
+        - date
+        - hostname
+        - df -Th
+        - uname -a
+        - cat /etc/fstab
+        - cat /etc/os-release
+        - lsblk
+        - mount -a
+      become: yes    
+      ignore_errors: yes
+      register: output
+
+    - debug:
+       msg: "{{ item.stdout_lines }}"
+      loop : "{{ output.results }}" 
